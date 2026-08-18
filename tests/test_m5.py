@@ -1,6 +1,7 @@
 """Tests for Module 5: Enrichment Pipeline."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import src.m5_enrichment as m5
 from src.m5_enrichment import (
     summarize_chunk, generate_hypothesis_questions,
     contextual_prepend, extract_metadata, enrich_chunks, EnrichedChunk,
@@ -67,3 +68,22 @@ def test_enrich_preserves_original():
     result = enrich_chunks(CHUNKS, methods=["contextual"])
     if result:
         assert result[0].original_text == SAMPLE
+
+
+def test_fallback_enrichment_adds_retrieval_context_without_api_key(monkeypatch):
+    """A missing API key must still produce useful contextual enrichment."""
+    monkeypatch.setattr(m5, "OPENAI_API_KEY", "")
+    result = m5.enrich_chunks(CHUNKS)
+
+    assert result[0].enriched_text.startswith("Trích từ policy.md.")
+    assert result[0].enriched_text.endswith(SAMPLE)
+    assert result[0].auto_metadata["language"] == "vi"
+
+
+def test_fallback_hyqa_generates_question_without_api_key(monkeypatch):
+    """The fallback must bridge query vocabulary instead of returning an empty list."""
+    monkeypatch.setattr(m5, "OPENAI_API_KEY", "")
+
+    questions = m5.generate_hypothesis_questions(SAMPLE, n_questions=2)
+
+    assert questions and questions[0].endswith("?")
